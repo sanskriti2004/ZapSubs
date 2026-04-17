@@ -1,13 +1,17 @@
-import app from './app.js';
-import { connectDB } from './db.js';
+import app from "./app.js";
+import { connectDB } from "./db.js";
+import { listenForEvents, startCronJob } from "./services/stellar.service.js";
 
 const PORT = process.env.PORT || 3000;
 
 async function start() {
-    await connectDB();
-    app.listen(PORT, () => {
-        console.log(`Server running on port ${PORT}`);
-    });
+  await connectDB();
+  // start event listener and cron
+  listenForEvents();
+  startCronJob();
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
 }
 
 start();
