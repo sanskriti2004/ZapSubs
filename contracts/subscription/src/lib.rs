@@ -8,33 +8,46 @@ const SUB_KEY: Symbol = symbol_short!("SUB");
 
 #[contracttype]
 #[derive(Clone)]
-pub enum SubscriptionEvent {
-    Deposited {
-        subscriber: Address,
-        amount: i128,
-    },
-    Withdrawn {
-        subscriber: Address,
-        amount: i128,
-    },
-    PaymentExecuted {
-        subscriber: Address,
-        merchant: Address,
-        amount: i128,
-    },
-    Paused {
-        subscriber: Address,
-    },
-    Resumed {
-        subscriber: Address,
-    },
-    Cancelled {
-        subscriber: Address,
-    },
+pub struct DepositedEvent {
+    pub subscriber: Address,
+    pub amount: i128,
 }
 
 #[contracttype]
-#[derive(Clone, PartialEq)]
+#[derive(Clone)]
+pub struct WithdrawnEvent {
+    pub subscriber: Address,
+    pub amount: i128,
+}
+
+#[contracttype]
+#[derive(Clone)]
+pub struct PaymentExecutedEvent {
+    pub subscriber: Address,
+    pub merchant: Address,
+    pub amount: i128,
+}
+
+#[contracttype]
+#[derive(Clone)]
+pub struct PausedEvent {
+    pub subscriber: Address,
+}
+
+#[contracttype]
+#[derive(Clone)]
+pub struct ResumedEvent {
+    pub subscriber: Address,
+}
+
+#[contracttype]
+#[derive(Clone)]
+pub struct CancelledEvent {
+    pub subscriber: Address,
+}
+
+#[contracttype]
+#[derive(Clone, PartialEq, Debug)]
 pub enum SubscriptionStatus {
     Active,
     Paused,
@@ -115,8 +128,8 @@ impl SubscriptionContract {
 
         // Emit deposit event
         env.events().publish(
-            (symbol_short!("DEPOSIT"), from.clone()),
-            SubscriptionEvent::Deposited {
+            (),
+            DepositedEvent {
                 subscriber: from,
                 amount,
             },
@@ -149,8 +162,8 @@ impl SubscriptionContract {
 
         // Emit withdrawal event
         env.events().publish(
-            (symbol_short!("WITHDRAW"), to.clone()),
-            SubscriptionEvent::Withdrawn {
+            (),
+            WithdrawnEvent {
                 subscriber: to,
                 amount,
             },
@@ -196,8 +209,8 @@ impl SubscriptionContract {
 
         // Emit payment execution event
         env.events().publish(
-            (symbol_short!("PAYMENT"), subscription.subscriber.clone()),
-            SubscriptionEvent::PaymentExecuted {
+            (),
+            PaymentExecutedEvent {
                 subscriber: subscription.subscriber,
                 merchant: subscription.merchant,
                 amount: subscription.amount,
@@ -225,10 +238,7 @@ impl SubscriptionContract {
         env.storage().instance().set(&SUB_KEY, &subscription);
 
         // Emit pause event
-        env.events().publish(
-            (symbol_short!("PAUSE"), caller.clone()),
-            SubscriptionEvent::Paused { subscriber: caller },
-        );
+        env.events().publish((), PausedEvent { subscriber: caller });
     }
 
     // Resume subscription
@@ -256,10 +266,8 @@ impl SubscriptionContract {
         env.storage().instance().set(&SUB_KEY, &subscription);
 
         // Emit resume event
-        env.events().publish(
-            (symbol_short!("RESUME"), caller.clone()),
-            SubscriptionEvent::Resumed { subscriber: caller },
-        );
+        env.events()
+            .publish((), ResumedEvent { subscriber: caller });
     }
 
     // Cancel subscription
@@ -292,10 +300,8 @@ impl SubscriptionContract {
         }
 
         // Emit cancel event
-        env.events().publish(
-            (symbol_short!("CANCEL"), caller.clone()),
-            SubscriptionEvent::Cancelled { subscriber: caller },
-        );
+        env.events()
+            .publish((), CancelledEvent { subscriber: caller });
     }
 }
 
@@ -303,13 +309,13 @@ impl SubscriptionContract {
 mod tests {
     use super::*;
     use crate::SubscriptionContractClient;
-    use soroban_sdk::testutils::{Address as _, Env as _};
+    use soroban_sdk::testutils::{Address as _, Ledger, MockAuth};
     use soroban_sdk::{token, vec};
 
     #[test]
     fn test_deposit() {
         let env = Env::default();
-        let contract_id = env.register_contract(None, SubscriptionContract);
+        let contract_id = env.register(SubscriptionContract, ());
         let client = SubscriptionContractClient::new(&env, &contract_id);
 
         let subscriber = Address::generate(&env);
@@ -317,17 +323,33 @@ mod tests {
         let token_admin = Address::generate(&env);
 
         // Create and mint test token
-        let token_id = env.register_stellar_asset_contract(token_admin.clone());
-        let token_client = token::Client::new(&env, &token_id);
-        let token_admin_client = token::StellarAssetClient::new(&env, &token_id);
+        let token_contract = env.register_stellar_asset_contract_v2(token_admin.clone());
+        let token_address = token_contract.address();
+        let token_client = token::Client::new(&env, &token_address);
+        let token_admin_client = token::StellarAssetClient::new(&env, &token_address);
 
-        token_admin_client.mint(&subscriber, &1000);
+        token_admin_client
+            .mock_auths(&[MockAuth {
+                address: token_admin.clone(),
+                nonce: None,
+            }])
+            .mint(&subscriber, &1000);
 
         // Initialize subscription
-        client.initialize(&subscriber, &merchant, &100, &86400); // 100 tokens, daily
+        client
+            .mock_auths(&[MockAuth {
+                address: &subscriber,
+                invoke: &contract_id,
+            }])
+            .initialize(&subscriber, &merchant, &100, &86400); // 100 tokens, daily
 
         // Deposit funds
-        client.deposit(&subscriber, &500);
+        client
+            .mock_auths(&[MockAuth {
+                address: &subscriber,
+                invoke: &contract_id,
+            }])
+            .deposit(&subscriber, &500);
 
         let subscription = client.get_subscription();
         assert_eq!(subscription.escrow_balance, 500);
@@ -336,7 +358,7 @@ mod tests {
     #[test]
     fn test_withdraw() {
         let env = Env::default();
-        let contract_id = env.register_contract(None, SubscriptionContract);
+        let contract_id = env.register(SubscriptionContract, ());
         let client = SubscriptionContractClient::new(&env, &contract_id);
 
         let subscriber = Address::generate(&env);
@@ -344,20 +366,41 @@ mod tests {
         let token_admin = Address::generate(&env);
 
         // Create and mint test token
-        let token_id = env.register_stellar_asset_contract(token_admin.clone());
-        let token_client = token::Client::new(&env, &token_id);
-        let token_admin_client = token::StellarAssetClient::new(&env, &token_id);
+        let token_contract = env.register_stellar_asset_contract_v2(token_admin.clone());
+        let token_address = token_contract.address();
+        let token_client = token::Client::new(&env, &token_address);
+        let token_admin_client = token::StellarAssetClient::new(&env, &token_address);
 
-        token_admin_client.mint(&subscriber, &1000);
+        token_admin_client
+            .mock_auths(&[MockAuth {
+                address: token_admin.clone(),
+                nonce: None,
+            }])
+            .mint(&subscriber, &1000);
 
         // Initialize subscription
-        client.initialize(&subscriber, &merchant, &100, &86400);
+        client
+            .mock_auths(&[MockAuth {
+                address: &subscriber,
+                invoke: &contract_id,
+            }])
+            .initialize(&subscriber, &merchant, &100, &86400);
 
         // Deposit funds
-        client.deposit(&subscriber, &500);
+        client
+            .mock_auths(&[MockAuth {
+                address: &subscriber,
+                invoke: &contract_id,
+            }])
+            .deposit(&subscriber, &500);
 
         // Withdraw funds
-        client.withdraw(&subscriber, &200);
+        client
+            .mock_auths(&[MockAuth {
+                address: &subscriber,
+                invoke: &contract_id,
+            }])
+            .withdraw(&subscriber, &200);
 
         let subscription = client.get_subscription();
         assert_eq!(subscription.escrow_balance, 300);
@@ -366,17 +409,27 @@ mod tests {
     #[test]
     fn test_pause_subscription() {
         let env = Env::default();
-        let contract_id = env.register_contract(None, SubscriptionContract);
+        let contract_id = env.register(SubscriptionContract, ());
         let client = SubscriptionContractClient::new(&env, &contract_id);
 
         let subscriber = Address::generate(&env);
         let merchant = Address::generate(&env);
 
         // Initialize subscription
-        client.initialize(&subscriber, &merchant, &100, &86400);
+        client
+            .mock_auths(&[MockAuth {
+                address: &subscriber,
+                invoke: &contract_id,
+            }])
+            .initialize(&subscriber, &merchant, &100, &86400);
 
         // Pause subscription
-        client.pause(&subscriber);
+        client
+            .mock_auths(&[MockAuth {
+                address: &subscriber,
+                invoke: &contract_id,
+            }])
+            .pause(&subscriber);
 
         let subscription = client.get_subscription();
         assert_eq!(subscription.status, SubscriptionStatus::Paused);
@@ -385,20 +438,35 @@ mod tests {
     #[test]
     fn test_resume_subscription() {
         let env = Env::default();
-        let contract_id = env.register_contract(None, SubscriptionContract);
+        let contract_id = env.register(SubscriptionContract, ());
         let client = SubscriptionContractClient::new(&env, &contract_id);
 
         let subscriber = Address::generate(&env);
         let merchant = Address::generate(&env);
 
         // Initialize subscription
-        client.initialize(&subscriber, &merchant, &100, &86400);
+        client
+            .mock_auths(&[MockAuth {
+                address: &subscriber,
+                invoke: &contract_id,
+            }])
+            .initialize(&subscriber, &merchant, &100, &86400);
 
         // Pause first
-        client.pause(&subscriber);
+        client
+            .mock_auths(&[MockAuth {
+                address: &subscriber,
+                invoke: &contract_id,
+            }])
+            .pause(&subscriber);
 
         // Resume subscription
-        client.resume(&subscriber);
+        client
+            .mock_auths(&[MockAuth {
+                address: &subscriber,
+                invoke: &contract_id,
+            }])
+            .resume(&subscriber);
 
         let subscription = client.get_subscription();
         assert_eq!(subscription.status, SubscriptionStatus::Active);
@@ -407,7 +475,7 @@ mod tests {
     #[test]
     fn test_cancel_subscription() {
         let env = Env::default();
-        let contract_id = env.register_contract(None, SubscriptionContract);
+        let contract_id = env.register(SubscriptionContract, ());
         let client = SubscriptionContractClient::new(&env, &contract_id);
 
         let subscriber = Address::generate(&env);
@@ -415,19 +483,40 @@ mod tests {
         let token_admin = Address::generate(&env);
 
         // Create and mint test token
-        let token_id = env.register_stellar_asset_contract(token_admin.clone());
-        let token_admin_client = token::StellarAssetClient::new(&env, &token_id);
+        let token_contract = env.register_stellar_asset_contract_v2(token_admin.clone());
+        let token_address = token_contract.address();
+        let token_admin_client = token::StellarAssetClient::new(&env, &token_address);
 
-        token_admin_client.mint(&subscriber, &1000);
+        token_admin_client
+            .mock_auths(&[MockAuth {
+                address: token_admin.clone(),
+                nonce: None,
+            }])
+            .mint(&subscriber, &1000);
 
         // Initialize subscription
-        client.initialize(&subscriber, &merchant, &100, &86400);
+        client
+            .mock_auths(&[MockAuth {
+                address: &subscriber,
+                invoke: &contract_id,
+            }])
+            .initialize(&subscriber, &merchant, &100, &86400);
 
         // Deposit funds
-        client.deposit(&subscriber, &500);
+        client
+            .mock_auths(&[MockAuth {
+                address: &subscriber,
+                invoke: &contract_id,
+            }])
+            .deposit(&subscriber, &500);
 
         // Cancel subscription
-        client.cancel(&subscriber);
+        client
+            .mock_auths(&[MockAuth {
+                address: &subscriber,
+                invoke: &contract_id,
+            }])
+            .cancel(&subscriber);
 
         let subscription = client.get_subscription();
         assert_eq!(subscription.status, SubscriptionStatus::Cancelled);
@@ -437,7 +526,7 @@ mod tests {
     #[test]
     fn test_execute_payment() {
         let env = Env::default();
-        let contract_id = env.register_contract(None, SubscriptionContract);
+        let contract_id = env.register(SubscriptionContract, ());
         let client = SubscriptionContractClient::new(&env, &contract_id);
 
         let subscriber = Address::generate(&env);
@@ -445,16 +534,32 @@ mod tests {
         let token_admin = Address::generate(&env);
 
         // Create and mint test token
-        let token_id = env.register_stellar_asset_contract(token_admin.clone());
-        let token_admin_client = token::StellarAssetClient::new(&env, &token_id);
+        let token_contract = env.register_stellar_asset_contract_v2(token_admin.clone());
+        let token_address = token_contract.address();
+        let token_admin_client = token::StellarAssetClient::new(&env, &token_address);
 
-        token_admin_client.mint(&subscriber, &1000);
+        token_admin_client
+            .mock_auths(&[MockAuth {
+                address: token_admin.clone(),
+                nonce: None,
+            }])
+            .mint(&subscriber, &1000);
 
         // Initialize subscription
-        client.initialize(&subscriber, &merchant, &100, &86400);
+        client
+            .mock_auths(&[MockAuth {
+                address: &subscriber,
+                invoke: &contract_id,
+            }])
+            .initialize(&subscriber, &merchant, &100, &86400);
 
         // Deposit funds
-        client.deposit(&subscriber, &500);
+        client
+            .mock_auths(&[MockAuth {
+                address: &subscriber,
+                invoke: &contract_id,
+            }])
+            .deposit(&subscriber, &500);
 
         // Fast forward time to make payment due
         env.ledger().set_timestamp(86401); // 1 second past interval
@@ -471,7 +576,7 @@ mod tests {
     #[should_panic(expected = "Payment is not due yet")]
     fn test_execute_payment_too_early() {
         let env = Env::default();
-        let contract_id = env.register_contract(None, SubscriptionContract);
+        let contract_id = env.register(SubscriptionContract, ());
         let client = SubscriptionContractClient::new(&env, &contract_id);
 
         let subscriber = Address::generate(&env);
@@ -479,16 +584,32 @@ mod tests {
         let token_admin = Address::generate(&env);
 
         // Create and mint test token
-        let token_id = env.register_stellar_asset_contract(token_admin.clone());
-        let token_admin_client = token::StellarAssetClient::new(&env, &token_id);
+        let token_contract = env.register_stellar_asset_contract_v2(token_admin.clone());
+        let token_address = token_contract.address();
+        let token_admin_client = token::StellarAssetClient::new(&env, &token_address);
 
-        token_admin_client.mint(&subscriber, &1000);
+        token_admin_client
+            .mock_auths(&[MockAuth {
+                address: token_admin.clone(),
+                nonce: None,
+            }])
+            .mint(&subscriber, &1000);
 
         // Initialize subscription
-        client.initialize(&subscriber, &merchant, &100, &86400);
+        client
+            .mock_auths(&[MockAuth {
+                address: &subscriber,
+                invoke: &contract_id,
+            }])
+            .initialize(&subscriber, &merchant, &100, &86400);
 
         // Deposit funds
-        client.deposit(&subscriber, &500);
+        client
+            .mock_auths(&[MockAuth {
+                address: &subscriber,
+                invoke: &contract_id,
+            }])
+            .deposit(&subscriber, &500);
 
         // Try to execute payment too early (should panic)
         client.execute_payment();
