@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useWallet } from '../context/WalletContext.jsx';
+import { useWallet } from '../context/useWallet.js';
 import { createSubscription } from '../services/api.js';
 
 export default function SubscriptionForm() {

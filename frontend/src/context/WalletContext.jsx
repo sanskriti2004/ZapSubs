@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useState } from 'react';
 import { connectWallet } from '../services/wallet.js';
 
 const WalletContext = createContext(null);
@@ -28,6 +28,4 @@ export function WalletProvider({ children }) {
     );
 }
 
-export function useWallet() {
-    return useContext(WalletContext);
-}
+

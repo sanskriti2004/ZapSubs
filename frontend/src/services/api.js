@@ -33,3 +33,18 @@ export async function getPaymentHistory(subscriber) {
     const res = await api.get(`/subscriptions/${subscriber}/payments`);
     return res.data;
 }
+
+export async function depositFunds(data) {
+    const res = await api.post(`/subscriptions/${data.subscriber}/deposit`, data);
+    return res.data;
+}
+
+export async function withdrawFunds(data) {
+    const res = await api.post(`/subscriptions/${data.subscriber}/withdraw`, data);
+    return res.data;
+}
+
+export async function payNow(subscriber) {
+    const res = await api.post(`/subscriptions/${subscriber}/pay`);
+    return res.data;
+}
