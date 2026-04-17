@@ -1,7 +1,7 @@
 import { createContext, useState } from 'react';
 import { connectWallet } from '../services/wallet.js';
 
-const WalletContext = createContext(null);
+export const WalletContext = createContext(null);
 
 export function WalletProvider({ children }) {
     const [publicKey, setPublicKey] = useState(null);

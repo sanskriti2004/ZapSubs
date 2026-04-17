@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useWallet } from '../context/WalletContext.jsx';
+import { useWallet } from '../context/useWallet.js';
 import { getSubscription, pauseSubscription, resumeSubscription, cancelSubscription, getPaymentHistory, depositFunds, withdrawFunds, payNow } from '../services/api.js';
 
 export default function Dashboard() {
