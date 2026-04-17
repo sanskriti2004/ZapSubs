@@ -13,8 +13,8 @@ jobs:
     - uses: actions/checkout@v4
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
-    - name: Install Soroban CLI
-      run: cargo install --locked soroban-cli
+    - name: Add wasm32 target
+      run: rustup target add wasm32-unknown-unknown
     - name: Build contract
       run: cd contracts/subscription && cargo build --target wasm32-unknown-unknown --release
 
@@ -33,7 +33,7 @@ jobs:
     - name: Lint
       run: cd backend && npm run lint || true
     - name: Test
-      run: cd backend && npm test || true
+      run: cd backend && CONTRACT_ID=dummy SUBSCRIBER_SECRET_KEY=dummy ADMIN_SECRET_KEY=dummy MONGODB_URI=mongodb://localhost npm test || true
 
   frontend:
     runs-on: ubuntu-latest
