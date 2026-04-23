@@ -13,7 +13,7 @@ const Subscription = require("../models/subscription.model.js");
 const Payment = require("../models/payment.model.js");
 const { sendNotification } = require("./notification.service.js");
 
-const server = new StellarSdk.SorobanRpc.Server(
+const server = new StellarSdk.rpc.Server(
   "https://soroban-testnet.stellar.org",
 );
 const networkPassphrase = Networks.TESTNET;
@@ -22,7 +22,7 @@ const networkPassphrase = Networks.TESTNET;
 const contractId = process.env.CONTRACT_ID;
 
 // contract instance
-const contract = new Contract(contractId);
+function getContract() { return new Contract(process.env.CONTRACT_ID); }
 
 module.exports.initializeSubscription = async function (
   subscriber,
@@ -38,7 +38,7 @@ module.exports.initializeSubscription = async function (
     networkPassphrase,
   })
     .addOperation(
-      contract.call("initialize", subscriber, merchant, amount, interval),
+      getContract().call("initialize", subscriber, merchant, amount, interval),
     )
     .setTimeout(30)
     .build();
@@ -56,7 +56,7 @@ module.exports.depositToEscrow = async function (subscriber, amount) {
     fee: "100",
     networkPassphrase,
   })
-    .addOperation(contract.call("deposit", subscriber, amount))
+    .addOperation(getContract().call("deposit", subscriber, amount))
     .setTimeout(30)
     .build();
 
@@ -73,7 +73,7 @@ module.exports.withdrawFromEscrow = async function (subscriber, amount) {
     fee: "100",
     networkPassphrase,
   })
-    .addOperation(contract.call("withdraw", subscriber, amount))
+    .addOperation(getContract().call("withdraw", subscriber, amount))
     .setTimeout(30)
     .build();
 
@@ -91,7 +91,7 @@ module.exports.executePayment = async function () {
     fee: "100",
     networkPassphrase,
   })
-    .addOperation(contract.call("execute_payment"))
+    .addOperation(getContract().call("execute_payment"))
     .setTimeout(30)
     .build();
 
@@ -108,7 +108,7 @@ module.exports.pauseSubscription = async function (subscriber) {
     fee: "100",
     networkPassphrase,
   })
-    .addOperation(contract.call("pause", subscriber))
+    .addOperation(getContract().call("pause", subscriber))
     .setTimeout(30)
     .build();
 
@@ -125,7 +125,7 @@ module.exports.resumeSubscription = async function (subscriber) {
     fee: "100",
     networkPassphrase,
   })
-    .addOperation(contract.call("resume", subscriber))
+    .addOperation(getContract().call("resume", subscriber))
     .setTimeout(30)
     .build();
 
@@ -142,7 +142,7 @@ module.exports.cancelSubscription = async function (subscriber) {
     fee: "100",
     networkPassphrase,
   })
-    .addOperation(contract.call("cancel", subscriber))
+    .addOperation(getContract().call("cancel", subscriber))
     .setTimeout(30)
     .build();
 
@@ -158,7 +158,7 @@ module.exports.getSubscriptionState = async function () {
     fee: "100",
     networkPassphrase,
   })
-    .addOperation(contract.call("get_subscription"))
+    .addOperation(getContract().call("get_subscription"))
     .setTimeout(30)
     .build();
 
@@ -255,3 +255,5 @@ module.exports.startCronJob = function () {
     }
   });
 };
+
+
