@@ -1,6 +1,6 @@
 import app from "./app.js";
 import { connectDB } from "./db.js";
-import { listenForEvents, startCronJob } from "./services/stellar.service.js";
+import { listenForEvents, startCronJob } from "./services/stellar.service.cjs";
 
 const PORT = process.env.PORT || 3000;
 
