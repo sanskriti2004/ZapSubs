@@ -1,6 +1,11 @@
-import { useState } from 'react';
+import { createContext, useContext, useState } from 'react';
 import { connectWallet } from '../services/wallet.js';
-import { WalletContext } from './WalletContext.js';
+
+export const WalletContext = createContext(null);
+
+export function useWallet() {
+    return useContext(WalletContext);
+}
 
 export function WalletProvider({ children }) {
     const [publicKey, setPublicKey] = useState(null);
@@ -26,5 +31,3 @@ export function WalletProvider({ children }) {
         </WalletContext.Provider>
     );
 }
-
-

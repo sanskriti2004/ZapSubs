@@ -1,15 +1,24 @@
-import { isConnected, getPublicKey, signTransaction } from '@stellar/freighter-api';
+import { requestAccess, getAddress, signTransaction } from '@stellar/freighter-api';
 
 export async function connectWallet() {
-    const connected = await isConnected();
-    if (!connected) {
-        throw new Error('Freighter wallet not found. Please install the Freighter extension.');
+    try {
+        const accessResult = await requestAccess();
+        if (accessResult.error) {
+            throw new Error(accessResult.error);
+        }
+        const { address } = await getAddress();
+        if (!address) {
+            throw new Error('No address returned.');
+        }
+        return address;
+    } catch (err) {
+        throw new Error('Could not connect to Freighter: ' + err.message);
     }
-    const publicKey = await getPublicKey();
-    return publicKey;
 }
 
 export async function signTx(xdr) {
-    const signed = await signTransaction(xdr, { network: 'TESTNET' });
-    return signed;
+    const { signedTxXdr } = await signTransaction(xdr, { 
+        networkPassphrase: 'Test SDF Network ; September 2015' 
+    });
+    return signedTxXdr;
 }

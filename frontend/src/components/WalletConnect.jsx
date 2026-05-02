@@ -1,4 +1,4 @@
-import { useWallet } from '../context/useWallet.js';
+import { useWallet } from '../context/WalletContext.jsx';
 
 export default function WalletConnect() {
     const { publicKey, connect, disconnect, error } = useWallet();

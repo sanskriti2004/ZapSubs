@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useWallet } from '../context/useWallet.js';
+import { useWallet } from '../context/WalletContext.jsx';
 import {
     getSubscription, pauseSubscription, resumeSubscription,
     cancelSubscription, getPaymentHistory,

@@ -3,7 +3,7 @@ import WalletConnect from './components/WalletConnect.jsx';
 import SubscriptionForm from './components/SubscriptionForm.jsx';
 import Dashboard from './components/Dashboard.jsx';
 import { WalletProvider } from './context/WalletContext.jsx';
-import { useWallet } from './context/useWallet.js';
+import { useWallet } from './context/WalletContext.jsx';
 
 function AppContent() {
     const { publicKey } = useWallet();
